@@ -1,23 +1,25 @@
-## OAK-D Lite on a Raspberry Pi 5 - *depthai_rospi* package
 
-This is a ROS2 (Jazzy) package designed to work with _OAK-D Lite_ camera on a Raspberry Pi 5.
-Based on [depthai_examples](https://github.com/luxonis/depthai-ros/tree/humble/depthai_examples) package.
+## OAK-D Lite on a Raspberry Pi 5 – *depthai_rospi* package
 
-Luxonis camera delivers data through _pipelines_, and when running at high frame rate (e.g. 30 FPS) - it overwhelmes ROS network (with data rate over 700 Mbits/s).
+**Note:** Review this [guide](https://github.com/slgrobotics/robots_bringup/blob/main/Docs/Sensors/OAK-D_Lite.md) first.
 
-There is a known issue - _OAK-D Lite_ doesn't support changing FPS via `i_fps` parameter or in code:
+This is a ROS 2 (Jazzy) package designed to work with the _OAK-D Lite_ camera on a Raspberry Pi 5.  
+It is based on the [depthai_examples](https://github.com/luxonis/depthai-ros/tree/humble/depthai_examples) package.
+
+Luxonis cameras deliver data through _pipelines_, and when running at high frame rates (e.g., 30 FPS), they can overwhelm the ROS network, with data rates exceeding 700 Mbit/s.
+
+There is a known issue: the _OAK-D Lite_ does not support changing FPS via the `i_fps` parameter or programmatically in code:  
 https://github.com/luxonis/depthai/issues/624
 
-In my experiments with OAK-D Lite, supplying correct `.yaml` file as [ROS parameter](https://github.com/slgrobotics/robots_bringup/blob/main/Docs/Sensors/OAK-D_Lite.md#configuration-files) worked fine, lowering FPS as intended.
+In my experiments with the OAK-D Lite, supplying a correct `.yaml` file as a [ROS parameter](https://github.com/slgrobotics/robots_bringup/blob/main/Docs/Sensors/OAK-D_Lite.md#configuration-files) worked well and lowered the FPS as intended.
 
-If `i_fps` doesn't have effect, the code in this package tries to read the pipeline as-is, but publishes only _some_ of the data.
-This makes rates of _Image_ and _PointCloud2_ topics acceptable for WiFi connected robots.
-It also runs _Publishers_ in a separate thread, and restarts it if device pipelines freeze.
+If `i_fps` has no effect, the code in this package reads the pipeline as-is but publishes only _some_ of the data.  
+This keeps the rates of the _Image_ and _PointCloud2_ topics acceptable for Wi-Fi-connected robots.
 
-**Note:** review this [guide](https://github.com/slgrobotics/robots_bringup/blob/main/Docs/Sensors/OAK-D_Lite.md) first.  
+The package also runs the _publishers_ in a separate thread and restarts them if the device pipeline freezes.
 
-We assume that your _OAK-D Lite_ camera is connected to Raspberry Pi, while you view data on your Workstation (Desktop PC).
-Both machines should run Ubuntu 24.04 - and Raspberry Pi can be "headless" (Server version of the OS).
+We assume that your _OAK-D Lite_ camera is connected to the Raspberry Pi, while you view the data on your workstation (desktop PC).  
+Both machines should run Ubuntu 24.04, and the Raspberry Pi can be “headless” (server version of the OS).
 
 ## Build
 
