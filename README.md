@@ -1,6 +1,26 @@
 
 ## OAK-D Lite on a Raspberry Pi 5 – *depthai_rospi* package
 
+### Important: DepthAI 2.x / 3.x incompatibility
+
+OAK-D cameras support for ROS2 **Lyrical Luth** is installed by:
+```
+sudo apt install ros-${ROS_DISTRO}-depthai-ros
+    Installing:                     
+      ros-lyrical-depthai-ros
+    Installing dependencies:
+      ros-lyrical-depthai-examples  ros-lyrical-depthai-filters
+```
+
+The old **Jazzy** DepthAI 2.x version is now replaced by:
+- DepthAI [version: 3.10.0](https://docs.luxonis.com/software-v3/depthai/)
+- DepthAI CMake directory: /opt/ros/lyrical/lib/aarch64-linux-gnu/cmake/depthai
+- `depthai_bridge`: 3.4.0
+
+This branch is work in progress, not finished yet.
+
+---------------------------------------
+
 **Note:** Review this [guide](https://github.com/slgrobotics/robots_bringup/blob/main/Docs/Sensors/OAK-D_Lite.md) first.
 
 This is a ROS 2 (Lyrical Luth) package designed to work with the _OAK-D Lite_ camera on a Raspberry Pi 5.  
