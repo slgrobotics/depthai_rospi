@@ -15,7 +15,7 @@
 #include "depthai/pipeline/MessageQueue.hpp"
 #include "depthai/device/Device.hpp"
 #include "depthai/pipeline/Pipeline.hpp"
-#include "depthai/pipeline/node/MonoCamera.hpp"
+#include "depthai/pipeline/node/Camera.hpp"
 #include "depthai/pipeline/node/StereoDepth.hpp"
 
 #include "BridgePublisherPi.hpp"
@@ -36,29 +36,19 @@ std::tuple<dai::Pipeline, int, int, std::shared_ptr<dai::MessageQueue>,
 #endif // TRACE
 
     dai::Pipeline pipeline;
-    dai::node::MonoCamera::Properties::SensorResolution monoResolution;
-    auto monoLeft = pipeline.create<dai::node::MonoCamera>();
-    auto monoRight = pipeline.create<dai::node::MonoCamera>();
     auto stereo = pipeline.create<dai::node::StereoDepth>();
-
-    // XLinkOut
-
 
     int width, height;
     if(resolution == "720p") {
-        monoResolution = dai::node::MonoCamera::Properties::SensorResolution::THE_720_P;
         width = 1280;
         height = 720;
     } else if(resolution == "400p") {
-        monoResolution = dai::node::MonoCamera::Properties::SensorResolution::THE_400_P;
         width = 640;
         height = 400;
     } else if(resolution == "800p") {
-        monoResolution = dai::node::MonoCamera::Properties::SensorResolution::THE_800_P;
         width = 1280;
         height = 800;
     } else if(resolution == "480p") {
-        monoResolution = dai::node::MonoCamera::Properties::SensorResolution::THE_480_P;
         width = 640;
         height = 480;
     } else {
@@ -66,11 +56,10 @@ std::tuple<dai::Pipeline, int, int, std::shared_ptr<dai::MessageQueue>,
         throw std::runtime_error("Invalid mono camera resolution.");
     }
 
-    // MonoCamera
-    monoLeft->setResolution(monoResolution);
-    monoLeft->setBoardSocket(dai::CameraBoardSocket::CAM_B);
-    monoRight->setResolution(monoResolution);
-    monoRight->setBoardSocket(dai::CameraBoardSocket::CAM_C);
+    // Preserve the selected sensor resolution and the original 30 FPS rate.
+    const std::pair<uint32_t, uint32_t> size{width, height};
+    auto monoLeft = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_B, size, 30.0f);
+    auto monoRight = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_C, size, 30.0f);
 
     // StereoDepth
     stereo->initialConfig->setConfidenceThreshold(confidence);
@@ -80,9 +69,11 @@ std::tuple<dai::Pipeline, int, int, std::shared_ptr<dai::MessageQueue>,
     stereo->setExtendedDisparity(extended);
     stereo->setSubpixel(subpixel);
 
-    // Link plugins CAM -> STEREO -> XLINK
-    monoLeft->out.link(stereo->left);
-    monoRight->out.link(stereo->right);
+    // Feed unrectified grayscale frames into StereoDepth for rectification.
+    monoLeft->requestOutput(size, dai::ImgFrame::Type::GRAY8, dai::ImgResizeMode::CROP,
+                            30.0f, false)->link(stereo->left);
+    monoRight->requestOutput(size, dai::ImgFrame::Type::GRAY8, dai::ImgResizeMode::CROP,
+                             30.0f, false)->link(stereo->right);
 
     auto leftQueue = stereo->rectifiedLeft.createOutputQueue(30, false);
     auto rightQueue = stereo->rectifiedRight.createOutputQueue(30, false);

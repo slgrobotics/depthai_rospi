@@ -126,7 +126,7 @@ BridgePublisherPi<RosMsg, SimMsg>::BridgePublisherPi(std::shared_ptr<dai::Messag
                                                  ConvertFunc converter,
                                                  rclcpp::QoS qosSetting,
                                                  bool lazyPublisher)
-    : _daiMessageQueue(daiMessageQueue), _node(node), _converter(converter), _it(node), _rosTopic(rosTopic), _lazyPublisher(lazyPublisher) {
+    : _daiMessageQueue(daiMessageQueue), _node(node), _converter(converter), _it(image_transport::RequiredInterfaces(*node)), _rosTopic(rosTopic), _lazyPublisher(lazyPublisher) {
     _rosPublisher = _node->create_publisher<RosMsg>(_rosTopic, qosSetting);
 }
 
@@ -142,7 +142,7 @@ BridgePublisherPi<RosMsg, SimMsg>::BridgePublisherPi(std::shared_ptr<dai::Messag
     : _daiMessageQueue(daiMessageQueue),
       _node(node),
       _converter(converter),
-      _it(node),
+      _it(image_transport::RequiredInterfaces(*node)),
       _rosTopic(rosTopic),
       _cameraParamUri(cameraParamUri),
       _cameraName(cameraName),
@@ -162,7 +162,7 @@ BridgePublisherPi<RosMsg, SimMsg>::BridgePublisherPi(std::shared_ptr<dai::Messag
     : _daiMessageQueue(daiMessageQueue),
       _node(node),
       _converter(converter),
-      _it(node),
+      _it(image_transport::RequiredInterfaces(*node)),
       _rosTopic(rosTopic),
       _cameraInfoData(cameraInfoData),
       _cameraName(cameraName),
