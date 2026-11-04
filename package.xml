@@ -12,7 +12,7 @@
 
   <license>MIT</license>
 
-  <buildtool_depend>ament_cmake_auto</buildtool_depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
   
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
@@ -26,6 +26,7 @@
   <depend>message_filters</depend>
   <depend>libopencv-dev</depend>
   <depend>ros_environment</depend>
+  <depend>geometry_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>stereo_msgs</depend>

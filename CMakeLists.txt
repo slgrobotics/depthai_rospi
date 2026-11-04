@@ -1,50 +1,23 @@
 cmake_minimum_required(VERSION 3.16)
 project(depthai_rospi VERSION 0.99.1 LANGUAGES CXX C)
 
-# C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+add_compile_options(-g)
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+## is used, also find other catkin packages
+if(POLICY CMP0057)
+    cmake_policy(SET CMP0057 NEW)
 endif()
 
-# ------------------------------------------------------------
-# Dependencies
-# ------------------------------------------------------------
-
-find_package(ament_cmake REQUIRED)
-
-find_package(OpenCV 4 REQUIRED COMPONENTS imgproc highgui)
-
-find_package(depthai CONFIG REQUIRED)
-find_package(depthai_bridge REQUIRED)
-find_package(depthai_ros_msgs REQUIRED)
-
-find_package(camera_info_manager REQUIRED)
-find_package(cv_bridge REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(rclcpp_components REQUIRED)
-find_package(message_filters REQUIRED)
-
-find_package(sensor_msgs REQUIRED)
-find_package(stereo_msgs REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(vision_msgs REQUIRED)
-find_package(visualization_msgs REQUIRED)
-
-message(STATUS "------------------------------------------")
-message(STATUS "Building depthai_rospi using ROS 2 AMENT")
-message(STATUS "OpenCV version: ${OpenCV_VERSION}")
-message(STATUS "------------------------------------------")
-
-# ------------------------------------------------------------
-# Neural network resources
-# ------------------------------------------------------------
+set(_opencv_version 4)
+find_package(OpenCV 4 QUIET COMPONENTS imgproc highgui)
+if(NOT OpenCV_FOUND)
+  set(_opencv_version 3)
+  find_package(OpenCV 3 REQUIRED COMPONENTS imgproc highgui)
+endif()
 
 set(tiny_yolo_v4_blob_name
   "yolov4_tiny_coco_416x416_openvino_2021.4_6shave_bgr.blob"
@@ -116,164 +89,93 @@ download_blob(
   "bdc2529f765f34c4799b478690fb4e32f1ad5d89"
 )
 
-# ------------------------------------------------------------
-# Dependency linking helper
-# ------------------------------------------------------------
+find_package(ament_cmake REQUIRED)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Prefer modern CMake targets.
-# Fall back to legacy ament exports where necessary.
+message(STATUS "------------------------------------------")
+message(STATUS "Depthai_rospi is being built using AMENT.")
+message(STATUS "------------------------------------------")
 
-function(link_ros_dependency target dependency)
+find_package(camera_info_manager REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(depthai 3 CONFIG REQUIRED)
+find_package(depthai_ros_msgs REQUIRED)
+find_package(depthai_bridge REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
+find_package(message_filters REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(image_transport REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(stereo_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(vision_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
-  if(TARGET "${dependency}::${dependency}")
-
-    target_link_libraries(${target} PRIVATE
-      "${dependency}::${dependency}"
-    )
-
-  elseif(DEFINED ${dependency}_TARGETS
-         AND NOT "${${dependency}_TARGETS}" STREQUAL "")
-
-    target_link_libraries(${target} PRIVATE
-      ${${dependency}_TARGETS}
-    )
-
-  else()
-
-    # Legacy packages may export include directories and libraries
-    # without providing imported CMake targets.
-
-    if(DEFINED ${dependency}_INCLUDE_DIRS)
-      target_include_directories(${target} PRIVATE
-        ${${dependency}_INCLUDE_DIRS}
-      )
-    endif()
-
-    if(DEFINED ${dependency}_LIBRARIES)
-      target_link_libraries(${target} PRIVATE
-        ${${dependency}_LIBRARIES}
-      )
-    endif()
-
-  endif()
-
-endfunction()
-
-set(ros_dependencies
-  camera_info_manager
-  cv_bridge
-  depthai_ros_msgs
-  depthai_bridge
-  rclcpp
-  rclcpp_components
-  sensor_msgs
-  stereo_msgs
-  std_msgs
-  vision_msgs
-  visualization_msgs
-  message_filters
+# Link exported CMake targets directly; Lyrical removed ament_target_dependencies.
+set(dependency_targets
+  camera_info_manager::camera_info_manager
+  cv_bridge::cv_bridge
+  depthai::core
+  depthai_bridge::depthai_bridge
+  rclcpp::rclcpp
+  rclcpp_components::component
+  image_transport::image_transport
+  message_filters::message_filters
+  ${depthai_ros_msgs_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${stereo_msgs_TARGETS}
+  ${std_msgs_TARGETS}
+  ${vision_msgs_TARGETS}
+  ${visualization_msgs_TARGETS}
+  opencv_imgproc
+  opencv_highgui
 )
 
-function(configure_ros_target target)
+macro(dai_add_node_ros2 node_name node_src)
+  add_executable("${node_name}" "${node_src}")
 
-  target_include_directories(${target} PRIVATE
-    "${PROJECT_SOURCE_DIR}/include"
-  )
+  target_include_directories("${node_name}" PRIVATE "${PROJECT_SOURCE_DIR}/include")
+  target_link_libraries("${node_name}" PRIVATE ${dependency_targets})
 
-  target_link_libraries(${target} PRIVATE
-    depthai::core
-    ${OpenCV_LIBS}
-  )
+endmacro()
 
-  target_include_directories(${target} PRIVATE
-    ${OpenCV_INCLUDE_DIRS}
-  )
 
-  foreach(dependency IN LISTS ros_dependencies)
-    link_ros_dependency(${target} ${dependency})
-  endforeach()
+dai_add_node_ros2(stereo_node src/stereo_publisher.cpp)
 
-endfunction()
-
-# ------------------------------------------------------------
-# Stereo publisher executable
-# ------------------------------------------------------------
-
-add_executable(stereo_node
-  src/stereo_publisher.cpp
-)
-
-configure_ros_target(stereo_node)
-
-# ------------------------------------------------------------
-# Spatial bounding box component
-# ------------------------------------------------------------
-
-add_library(spatial_bb_component SHARED
+add_library(
+  spatial_bb_component SHARED
   src/spatial_bb.cpp
   src/utils.cpp
 )
 
-configure_ros_target(spatial_bb_component)
+rclcpp_components_register_nodes(spatial_bb_component "depthai_rospi_filters::SpatialBB")
 
-rclcpp_components_register_nodes(
-  spatial_bb_component
-  "depthai_rospi_filters::SpatialBB"
-)
+target_include_directories(spatial_bb_component PRIVATE "${PROJECT_SOURCE_DIR}/include")
+target_link_libraries(spatial_bb_component PRIVATE ${dependency_targets})
 
-# ------------------------------------------------------------
-# Installation
-# ------------------------------------------------------------
-
-install(
-  TARGETS spatial_bb_component
-  EXPORT export_spatial_bb_component
+install(TARGETS spatial_bb_component
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
 
+install(DIRECTORY params DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY resources DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
+
+install(TARGETS
+        stereo_node
+        DESTINATION lib/${PROJECT_NAME})
+
+ament_export_include_directories(
+  include
+)
 install(
-  TARGETS stereo_node
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-install(
-  DIRECTORY
-    params
-    resources
-    launch
-    config
-  DESTINATION share/${PROJECT_NAME}
-)
-
-install(
-  DIRECTORY include/
-  DESTINATION include
-)
-
-# ------------------------------------------------------------
-# Exports
-# ------------------------------------------------------------
-
-ament_export_targets(
-  export_spatial_bb_component
-  HAS_LIBRARY_TARGET
-)
-
-ament_export_dependencies(
-  camera_info_manager
-  cv_bridge
-  depthai_ros_msgs
-  depthai_bridge
-  rclcpp
-  rclcpp_components
-  sensor_msgs
-  stereo_msgs
-  std_msgs
-  vision_msgs
-  visualization_msgs
-  message_filters
+    DIRECTORY include/
+    DESTINATION include
 )
 
 ament_package()
+

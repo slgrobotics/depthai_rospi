@@ -12,19 +12,20 @@
 #include "stereo_msgs/msg/disparity_image.hpp"
 
 // Inludes common necessary includes for development using depthai library
-#include "depthai/device/DataQueue.hpp"
+#include "depthai/pipeline/MessageQueue.hpp"
 #include "depthai/device/Device.hpp"
 #include "depthai/pipeline/Pipeline.hpp"
 #include "depthai/pipeline/node/MonoCamera.hpp"
 #include "depthai/pipeline/node/StereoDepth.hpp"
-#include "depthai/pipeline/node/XLinkOut.hpp"
+
 #include "BridgePublisherPi.hpp"
 #include "depthai_bridge/DisparityConverter.hpp"
 #include "depthai_bridge/ImageConverter.hpp"
 
 //#define TRACE
 
-std::tuple<dai::Pipeline, int, int> createPipeline(
+std::tuple<dai::Pipeline, int, int, std::shared_ptr<dai::MessageQueue>,
+           std::shared_ptr<dai::MessageQueue>, std::shared_ptr<dai::MessageQueue>> createPipeline(
                 bool lrcheck, bool extended, bool subpixel,
                 int confidence, int LRchecktresh, std::string resolution)
 {
@@ -38,16 +39,10 @@ std::tuple<dai::Pipeline, int, int> createPipeline(
     dai::node::MonoCamera::Properties::SensorResolution monoResolution;
     auto monoLeft = pipeline.create<dai::node::MonoCamera>();
     auto monoRight = pipeline.create<dai::node::MonoCamera>();
-    auto xoutLeft = pipeline.create<dai::node::XLinkOut>();
-    auto xoutRight = pipeline.create<dai::node::XLinkOut>();
     auto stereo = pipeline.create<dai::node::StereoDepth>();
-    auto xoutDepth = pipeline.create<dai::node::XLinkOut>();
 
     // XLinkOut
-    xoutLeft->setStreamName("left");
-    xoutRight->setStreamName("right");
 
-    xoutDepth->setStreamName("depth");
 
     int width, height;
     if(resolution == "720p") {
@@ -78,9 +73,9 @@ std::tuple<dai::Pipeline, int, int> createPipeline(
     monoRight->setBoardSocket(dai::CameraBoardSocket::CAM_C);
 
     // StereoDepth
-    stereo->initialConfig.setConfidenceThreshold(confidence);
+    stereo->initialConfig->setConfidenceThreshold(confidence);
     stereo->setRectifyEdgeFillColor(0);  // black, to better see the cutout
-    stereo->initialConfig.setLeftRightCheckThreshold(LRchecktresh);
+    stereo->initialConfig->setLeftRightCheckThreshold(LRchecktresh);
     stereo->setLeftRightCheck(lrcheck);
     stereo->setExtendedDisparity(extended);
     stereo->setSubpixel(subpixel);
@@ -89,12 +84,11 @@ std::tuple<dai::Pipeline, int, int> createPipeline(
     monoLeft->out.link(stereo->left);
     monoRight->out.link(stereo->right);
 
-    stereo->rectifiedLeft.link(xoutLeft->input);
-    stereo->rectifiedRight.link(xoutRight->input);
+    auto leftQueue = stereo->rectifiedLeft.createOutputQueue(30, false);
+    auto rightQueue = stereo->rectifiedRight.createOutputQueue(30, false);
+    auto depthQueue = stereo->depth.createOutputQueue(30, false);
 
-    stereo->depth.link(xoutDepth->input);
-
-    return std::make_tuple(pipeline, width, height);
+    return std::make_tuple(pipeline, width, height, leftQueue, rightQueue, depthQueue);
 }
 
 static rclcpp::Node::SharedPtr node;
@@ -113,21 +107,20 @@ static int cnt_freezes_ = 0;
 
 void runPublishers()
 {
-    dai::Pipeline pipeline;
+    dai::Pipeline pipeline(false);
 
 #ifdef TRACE
     std::cout << "IP: runPublishers()" << std::endl;
     std::cout << "FYI: tfPrefix: " << tfPrefix << "  monoResolution_: " << monoResolution_ << std::endl;
 #endif // TRACE
 
-    std::tie(pipeline, monoWidth, monoHeight) = createPipeline(lrcheck_, extended_, subpixel_, confidence_, LRchecktresh_, monoResolution_);
-    dai::Device device(pipeline);
-    auto leftQueue = device.getOutputQueue("left", 30, false);
-    auto rightQueue = device.getOutputQueue("right", 30, false);
-    std::shared_ptr<dai::DataOutputQueue> stereoQueue;
-    stereoQueue = device.getOutputQueue("depth", 30, false);
+    std::shared_ptr<dai::MessageQueue> leftQueue, rightQueue, stereoQueue;
+    std::tie(pipeline, monoWidth, monoHeight, leftQueue, rightQueue, stereoQueue) =
+        createPipeline(lrcheck_, extended_, subpixel_, confidence_, LRchecktresh_, monoResolution_);
+    auto device = pipeline.getDefaultDevice();
+    pipeline.start();
 
-    auto calibrationHandler = device.readCalibration();
+    auto calibrationHandler = device->readCalibration();
 
     auto boardName = calibrationHandler.getEepromData().boardName;
 #ifdef TRACE
@@ -138,13 +131,15 @@ void runPublishers()
         monoHeight = 480;
     }
 
-    dai::rosBridge::ImageConverter converter(tfPrefix + "_left_camera_optical_frame", true);
+    depthai_bridge::ImageConverter converter(tfPrefix + "_left_camera_optical_frame", true);
     auto leftCameraInfo = converter.calibrationToCameraInfo(calibrationHandler, dai::CameraBoardSocket::CAM_B, monoWidth, monoHeight);
     dai::rosBridge::BridgePublisherPi<sensor_msgs::msg::Image, dai::ImgFrame> leftPublish(
         leftQueue,
         node,
         std::string("left/image_rect"),
-        std::bind(&dai::rosBridge::ImageConverter::toRosMsg, &converter, std::placeholders::_1, std::placeholders::_2),
+        [&converter](std::shared_ptr<dai::ImgFrame> frame, std::deque<sensor_msgs::msg::Image>& messages) {
+            converter.toRosMsg(frame, messages);
+        },
         30,
         leftCameraInfo,
         "left");
@@ -154,13 +149,15 @@ void runPublishers()
     leftPublish.setFpsDivider(fpsDivider_);   
     leftPublish.startPublisherThread();
 
-    dai::rosBridge::ImageConverter rightconverter(tfPrefix + "_right_camera_optical_frame", true);
+    depthai_bridge::ImageConverter rightconverter(tfPrefix + "_right_camera_optical_frame", true);
     auto rightCameraInfo = converter.calibrationToCameraInfo(calibrationHandler, dai::CameraBoardSocket::CAM_C, monoWidth, monoHeight);
     dai::rosBridge::BridgePublisherPi<sensor_msgs::msg::Image, dai::ImgFrame> rightPublish(
         rightQueue,
         node,
         std::string("right/image_rect"),
-        std::bind(&dai::rosBridge::ImageConverter::toRosMsg, &rightconverter, std::placeholders::_1, std::placeholders::_2),
+        [&rightconverter](std::shared_ptr<dai::ImgFrame> frame, std::deque<sensor_msgs::msg::Image>& messages) {
+            rightconverter.toRosMsg(frame, messages);
+        },
         30,
         rightCameraInfo,
         "right");
@@ -170,17 +167,15 @@ void runPublishers()
     rightPublish.setFpsDivider(fpsDivider_);   
     rightPublish.startPublisherThread();
 
-    dai::rosBridge::ImageConverter rightconverter_(tfPrefix + "_right_camera_optical_frame", true);
+    depthai_bridge::ImageConverter rightconverter_(tfPrefix + "_right_camera_optical_frame", true);
     auto rightCameraInfo_ = converter.calibrationToCameraInfo(calibrationHandler, dai::CameraBoardSocket::CAM_C, monoWidth, monoHeight);
     dai::rosBridge::BridgePublisherPi<sensor_msgs::msg::Image, dai::ImgFrame> depthPublish(
         stereoQueue,
         node,
         std::string("stereo/depth"),
-        std::bind(&dai::rosBridge::ImageConverter::toRosMsg,
-                    &rightconverter_,  // since the converter has the same frame name
-                                    // and image type is also same we can reuse it
-                    std::placeholders::_1,
-                    std::placeholders::_2),
+        [&rightconverter_](std::shared_ptr<dai::ImgFrame> frame, std::deque<sensor_msgs::msg::Image>& messages) {
+            rightconverter_.toRosMsg(frame, messages);
+        },
         30,
         rightCameraInfo_,
         "stereo");
@@ -188,6 +183,15 @@ void runPublishers()
     depthPublish_ = &depthPublish;
     depthPublish.setFpsDivider(fpsDivider_);   
     depthPublish.startPublisherThread();
+
+    // Keep the pipeline, converters, and publishers alive while frames are consumed.
+    while(rclcpp::ok() && pipeline.isRunning()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    pipeline.stop();
+    leftPublish.stopPublisherThread();
+    rightPublish.stopPublisherThread();
+    depthPublish.stopPublisherThread();
 }
 
 void workerTask()

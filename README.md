@@ -3,6 +3,8 @@
 
 ### Important: DepthAI 2.x / 3.x incompatibility
 
+This port to ROS2 Lyrical requires DepthAI 3.x
+
 OAK-D cameras support for ROS2 **Lyrical Luth** is installed by:
 ```
 sudo apt install ros-${ROS_DISTRO}-depthai-ros

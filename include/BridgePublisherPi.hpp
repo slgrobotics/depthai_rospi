@@ -5,7 +5,7 @@
 #include <typeinfo>
 
 #include "camera_info_manager/camera_info_manager.hpp"
-#include "depthai/device/DataQueue.hpp"
+#include "depthai/pipeline/MessageQueue.hpp"
 #include "image_transport/image_transport.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/qos.hpp"
@@ -32,14 +32,14 @@ class BridgePublisherPi {
                                                       std::shared_ptr<image_transport::Publisher>,
                                                       typename rclcpp::Publisher<RosMsg>::SharedPtr>::type;
 
-    BridgePublisherPi(std::shared_ptr<dai::DataOutputQueue> daiMessageQueue,
+    BridgePublisherPi(std::shared_ptr<dai::MessageQueue> daiMessageQueue,
                     std::shared_ptr<rclcpp::Node> node,
                     std::string rosTopic,
                     ConvertFunc converter,
                     rclcpp::QoS qosSetting = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
                     bool lazyPublisher = true);
 
-    BridgePublisherPi(std::shared_ptr<dai::DataOutputQueue> daiMessageQueue,
+    BridgePublisherPi(std::shared_ptr<dai::MessageQueue> daiMessageQueue,
                     std::shared_ptr<rclcpp::Node> node,
                     std::string rosTopic,
                     ConvertFunc converter,
@@ -48,7 +48,7 @@ class BridgePublisherPi {
                     std::string cameraName = "",
                     bool lazyPublisher = true);
 
-    BridgePublisherPi(std::shared_ptr<dai::DataOutputQueue> daiMessageQueue,
+    BridgePublisherPi(std::shared_ptr<dai::MessageQueue> daiMessageQueue,
                     std::shared_ptr<rclcpp::Node> node,
                     std::string rosTopic,
                     ConvertFunc converter,
@@ -91,7 +91,7 @@ class BridgePublisherPi {
     void daiCallback(std::string name, std::shared_ptr<ADatatype> data);
 
     static const std::string LOG_TAG;
-    std::shared_ptr<dai::DataOutputQueue> _daiMessageQueue;
+    std::shared_ptr<dai::MessageQueue> _daiMessageQueue;
     ConvertFunc _converter;
     int fpsDivider_ = 10;
     unsigned int cnt_mult_ = 0;
@@ -120,7 +120,7 @@ template <class RosMsg, class SimMsg>
 const std::string BridgePublisherPi<RosMsg, SimMsg>::LOG_TAG = "BridgePublisherPi";
 
 template <class RosMsg, class SimMsg>
-BridgePublisherPi<RosMsg, SimMsg>::BridgePublisherPi(std::shared_ptr<dai::DataOutputQueue> daiMessageQueue,
+BridgePublisherPi<RosMsg, SimMsg>::BridgePublisherPi(std::shared_ptr<dai::MessageQueue> daiMessageQueue,
                                                  std::shared_ptr<rclcpp::Node> node,
                                                  std::string rosTopic,
                                                  ConvertFunc converter,
@@ -131,7 +131,7 @@ BridgePublisherPi<RosMsg, SimMsg>::BridgePublisherPi(std::shared_ptr<dai::DataOu
 }
 
 template <class RosMsg, class SimMsg>
-BridgePublisherPi<RosMsg, SimMsg>::BridgePublisherPi(std::shared_ptr<dai::DataOutputQueue> daiMessageQueue,
+BridgePublisherPi<RosMsg, SimMsg>::BridgePublisherPi(std::shared_ptr<dai::MessageQueue> daiMessageQueue,
                                                  std::shared_ptr<rclcpp::Node> node,
                                                  std::string rosTopic,
                                                  ConvertFunc converter,
@@ -151,7 +151,7 @@ BridgePublisherPi<RosMsg, SimMsg>::BridgePublisherPi(std::shared_ptr<dai::DataOu
 }
 
 template <class RosMsg, class SimMsg>
-BridgePublisherPi<RosMsg, SimMsg>::BridgePublisherPi(std::shared_ptr<dai::DataOutputQueue> daiMessageQueue,
+BridgePublisherPi<RosMsg, SimMsg>::BridgePublisherPi(std::shared_ptr<dai::MessageQueue> daiMessageQueue,
                                                  std::shared_ptr<rclcpp::Node> node,
                                                  std::string rosTopic,
                                                  ConvertFunc converter,

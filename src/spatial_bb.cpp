@@ -11,9 +11,11 @@ SpatialBB::SpatialBB(const rclcpp::NodeOptions& options) : rclcpp::Node("spatial
     onInit();
 }
 void SpatialBB::onInit() {
-    previewSub.subscribe(this, "rgb/preview/image_raw");
-    infoSub.subscribe(this, "stereo/camera_info");
-    detSub.subscribe(this, "nn/spatial_detections");
+    const message_filters::SubscriberBase::RequiredInterfaces interfaces(
+        get_node_parameters_interface(), get_node_topics_interface());
+    previewSub.subscribe(interfaces, "rgb/preview/image_raw", rclcpp::QoS(10));
+    infoSub.subscribe(interfaces, "stereo/camera_info", rclcpp::QoS(10));
+    detSub.subscribe(interfaces, "nn/spatial_detections", rclcpp::QoS(10));
     sync = std::make_unique<message_filters::Synchronizer<syncPolicy>>(syncPolicy(10), previewSub, infoSub, detSub);
     sync->registerCallback(std::bind(&SpatialBB::overlayCB, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     markerPub = this->create_publisher<visualization_msgs::msg::MarkerArray>("spatial_bb", 10);
