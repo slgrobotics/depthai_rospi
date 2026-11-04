@@ -19,14 +19,12 @@ The old **Jazzy** DepthAI 2.x version is now replaced by:
 - DepthAI CMake directory: /opt/ros/lyrical/lib/aarch64-linux-gnu/cmake/depthai
 - `depthai_bridge`: 3.4.0
 
-This branch is work in progress, not finished yet.
-
 ---------------------------------------
 
-**Note:** Review this [guide](https://github.com/slgrobotics/robots_bringup/blob/main/Docs/Sensors/OAK-D_Lite.md) first.
-
-This is a ROS 2 (Lyrical Luth) package designed to work with the _OAK-D Lite_ camera on a Raspberry Pi 5.  
-It is based on the [depthai_examples](https://github.com/luxonis/depthai-ros/tree/humble/depthai_examples) package.
+**Note:** 
+- Review this [guide](https://github.com/slgrobotics/robots_bringup/blob/main/Docs/Sensors/OAK-D_Lite.md) first.
+- This is a ROS 2 (Lyrical Luth) package designed to work with the _OAK-D Lite_ camera on a Raspberry Pi 5.  
+- It is based on the [depthai_examples](https://github.com/luxonis/depthai-ros/tree/humble/depthai_examples) package.
 
 Luxonis cameras deliver data through _pipelines_, and when running at high frame rates (e.g., 30 FPS), they can overwhelm the ROS network, with data rates exceeding 700 Mbit/s.
 
@@ -53,7 +51,7 @@ Now you can clone and build this customized package on Raspberry Pi:
 ```
 mkdir -p ~/depthai_ws/src
 cd ~/depthai_ws/src
-git clone https://github.com/slgrobotics/depthai_rospi.git
+git clone https://github.com/slgrobotics/depthai_rospi.git -b lyrical
 cd ~/depthai_ws
 colcon build
 ```
